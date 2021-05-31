@@ -1,0 +1,114 @@
+
+######################################################################################
+#################### Running OLS- regressions ########################################
+######################################################################################
+# lm() function to create a regression model given some formula, in the form of Y~X+X2. 
+
+lm.test.all.1 <- lm(women.bothhouses.parliaments~ inclusive + year +
+                  gcman + unity +
+                  gcseats1 + gcseats2 + gcseats3 + partynoethnic + 
+                  mveto +resman + resimp, 
+                data= tidy_ps_data)
+summ(lm.test.all.1) #summ function from the JTOOLS package: nice summary
+lm.test.all.2 <- lm(v2x_gender~ inclusive + year +
+                  gcman + unity +
+                  gcseats1 + gcseats2 + gcseats3 + partynoethnic + 
+                  mveto +resman + resimp, 
+                data= tidy_ps_data)
+lm.test.all.3 <- lm(v2x_genpp~ inclusive + year +
+                  gcman + unity +
+                  gcseats1 + gcseats2 + gcseats3 + partynoethnic + 
+                  mveto +resman + resimp, 
+                data= tidy_ps_data)
+lm.test.all.4 <- lm(v2x_gencs~ inclusive + year +
+                  gcman + unity +
+                  gcseats1 + gcseats2 + gcseats3 + partynoethnic + 
+                  mveto +resman + resimp, 
+                data= tidy_ps_data)
+lm.test.all.5 <- lm(v2x_gencl~ inclusive + year +
+                  gcman + unity +
+                  gcseats1 + gcseats2 + gcseats3 + partynoethnic + 
+                  mveto +resman + resimp, 
+                data= tidy_ps_data)
+stargazer::stargazer(lm.test.all.1, lm.test.all.2, lm.test.all.3, lm.test.all.4, lm.test.all.5, 
+          title="Regression Results", align=TRUE, type = "latex")
+
+###################################################################
+#### Running bivariate OLS regressions #############################
+#### working on developing the following #### #######################
+######################################################################
+# 1. a time variable (keep in both OLS-bivariate regressions and tables)
+# 2. make a dummy variable civil conflict or not + time variable since conflict + battle deaths. (3 vari)
+# 3. GDP per capita and oil export (2 separate variables)
+# I have already created a lagged variable in dataframe:called "inclusive.lag1"
+######################################################################
+ols.biv.1.1 <- lm(women.bothhouses.parliaments ~ inclusive + as.factor(year),  
+                data= tidy_ps_data) # include time variable and t-lag 1 year on inclusive 
+ols.biv.1.2 <- lm(v2x_genpp ~ inclusive + as.factor(year),
+                 data = tidy_ps_data)
+ols.biv.1.3 <- lm(v2x_gencl ~ inclusive + as.factor(year),
+                 data = tidy_ps_data)
+ols.biv.1.4 <- lm(v2x_gencs ~ inclusive + as.factor(year), 
+                 data = tidy_ps_data)
+ols.biv.1.5 <- lm(v2x_gender ~ inclusive + as.factor(year), 
+                 data = tidy_ps_data)
+                 
+                 
+###############################################################################
+################## RUN ALL CONTROL VARIABLES IN POOLED OLS using plm ##########
+###############################################################################
+ols.all.var.1 <- lm(women.bothhouses.parliaments ~ inclusive + 
+                    e_migdppcln + oil_log + incidencev414 +
+                    numbrofyearsonsetv414 + maxintyearv414 + as.factor(year),
+                    data= tidy_ps_data)
+
+ols.all.var.2 <- lm(v2x_genpp ~ inclusive + 
+                      e_migdppcln + oil_log + incidencev414 +
+                      numbrofyearsonsetv414 + maxintyearv414 + as.factor(year), 
+                    data= tidy_ps_data)
+ols.all.var.3 <- lm(v2x_gencl ~ inclusive + 
+                      e_migdppcln + oil_log + incidencev414 +
+                      numbrofyearsonsetv414 + maxintyearv414 + as.factor(year), 
+                    data= tidy_ps_data)
+ols.all.var.4 <- lm(v2x_gencs ~ inclusive + 
+                      e_migdppcln + oil_log + incidencev414 +
+                      numbrofyearsonsetv414 + maxintyearv414 + as.factor(year), 
+                    data= tidy_ps_data)
+ols.all.var.5 <- lm(v2x_gender ~ inclusive + 
+                      e_migdppcln + oil_log + incidencev414 +
+                      numbrofyearsonsetv414 + maxintyearv414 + as.factor(year), 
+                    data= tidy_ps_data)
+                    
+#############################################################################################
+################## RUN ALL CONTROL VARIABLES IN POOLED OLS using plm fixest package #########
+#############################################################################################
+library(plm)
+
+pool.ols.1<- plm(women.bothhouses.parliaments ~ inclusive + 
+                        e_migdppcln + oil_log  +
+                        maxintyearv414,
+                 data = tidy_ps_data [which(!is.na(tidy_ps_data$country)), ], 
+                 model = "within",
+                 index = c("country"))
+pool.ols.2<- plm(v2x_genpp ~ inclusive + 
+                   e_migdppcln + oil_log + maxintyearv414,
+                 data = tidy_ps_data [which(!is.na(tidy_ps_data$country)), ], 
+                 model = "within",
+                 index = c("country"))
+pool.ols.3<- plm(v2x_gencl ~ inclusive + 
+                   e_migdppcln + oil_log +  maxintyearv414,
+                 data = tidy_ps_data [which(!is.na(tidy_ps_data$country)), ], 
+                 model = "within",
+                 index = c("country"))
+pool.ols.4<- plm(v2x_gencs ~ inclusive + 
+                   e_migdppcln + oil_log +  maxintyearv414,
+                 data = tidy_ps_data [which(!is.na(tidy_ps_data$country)), ], 
+                 model = "within",
+                 index = c("country"))
+pool.ols.5<- plm(v2x_gender ~ inclusive + 
+                   e_migdppcln + oil_log + maxintyearv414,
+                 data = tidy_ps_data [which(!is.na(tidy_ps_data$country)), ], 
+                 model = "within",
+                 index = c("country"))
+
+fixef(pool.ols.1)
