@@ -1,0 +1,102 @@
+####################################################################################
+######################## MAIN MODELS USED IN ANALYSIS ##############################
+######## Report results with and without year fixed effects  #######################
+####################################################################################
+#Country-fixed Effects with year as control variable
+results.country.fixeff.all <- feols(c(women.bothhouses.parliaments, v2x_genpp,
+                                v2x_gencs, v2x_gencl) ~ inclusive + 
+                               e_migdppcln + oil_log + maxintyearv414 + year
+                               |country, 
+                               cluster = "country",
+                               data = tidy_ps_data)
+
+etable(results.country.fixeff.all,
+       dict = myDict,
+       file = "All variables", 
+       title = "All variables: Results country-fixed effects models",
+       tex=TRUE)
+
+#Country-year Fixed Effects 
+main.model <- feols(c(women.bothhouses.parliaments, v2x_genpp, v2x_gencs,
+                 v2x_gencl) ~ inclusive + inclusive * post_2000 +
+        e_migdppcln + oil_log + maxintyearv414
+      |country + year, 
+      data = tidy_ps_data,
+      cluster = "country")
+
+nye.label = c(women.bothhouses.parliaments = "Women's share parliament",
+              v2x_genpp = "Women's political participation",
+              v2x_gencs = "Women's civil society participation",
+              v2x_gencl = "Women's civil liberties",
+              inclusive = "Inclusive power sharing",
+              e_migdppcln = "GDP per capita logged", 
+              oil_log = "Petroleum product. per capita logged",
+              maxintyearv414 = "Intensity level/conflict country-year",
+              year = "Year") 
+
+etable(main.model, dict = nye.label)
+
+etable(main.model,
+       dict = nye.label,
+       file = "Country-year fixed effects", 
+       title = "Country-year linear fixed effects models",
+       tex=TRUE)
+
+
+only.one.dependent <- feols(women.bothhouses.parliaments ~ inclusive + 
+                                 e_migdppcln + oil_log + maxintyearv414
+                               |country + year, 
+                               data = tidy_ps_data,
+                               cluster = "country")
+
+coefplot(only.one.dependent) 
+
+#####################################################################
+#SWITCH variables TO CHECK FOR REVERSED CAUSALITY: ENDOGENEITY BIAS
+#####################################################################
+results.SWITCH.Inclusive <- feols(inclusive ~ women.bothhouses.parliaments +
+                                  v2x_genpp + v2x_gencl + v2x_gencs + e_migdppcln + 
+                                    oil_log + maxintyearv414
+                                   |country + year,
+                                   cluster = "country",
+                                   data = tidy_ps_data)
+etable(results.SWITCH.Inclusive, 
+       dict = myDict,
+       file = "SWITCHED Inclusive as dependent", 
+       title = "SWITCHED Inclusive as dependent",
+       tex=TRUE)
+
+# The variable myDict is the dictionary, we use to rename the variables, it is simply a named vector
+myDict = c(women.bothhouses.parliaments = "Women share parliaments",
+           v2x_genpp = "Women political empow.index",
+           v2x_gender = "Women political participation", 
+           v2x_gencl = "Women civil liberties",
+           v2x_gencs = "Women civil society",
+           v2x_gender = "Women political participation", 
+           e_migdppcln = "GDP per capita logged", 
+           oil_log = "Petroleum product. per capita logged",
+           incidencev414 ="Dummy intrastate conflict",
+           numbrofyearsonsetv414 = "Number of years since last conflict", 
+           maxintyearv414 = "intensity level in the country-year") 
+           
+#create confidence interval 95% point_estimate +/ - 1.96*se
+s <- ggplot(coefff, aes(new, coef))+
+  geom_point(color = "orange")+
+  theme_bw()+
+  geom_hline(yintercept = 0) +
+  geom_linerange(aes(x = new, ymin = coef - 1.96*se, 
+                     ymax = coef + 1.96*se), color="blue") +
+  labs(title = "Coefficient estimates", 
+       subtitle = "on Women's share in parliament",
+       caption = "Country-year Fixed Effects",
+       x = "Independent variables", y = "Coefficients") + 
+  coord_flip()+scale_y_continuous(breaks = seq(-2, 3, 0.5))
+  
+  #fargelagt korrelasjonsmatrise
+library(corrplot)
+
+matrise<-cor(tidy_ps_data[, c("inclusive","women.bothhouses.parliaments",
+                                 "v2x_gencl","v2x_gencs","v2x_genpp")],
+             use = "pairwise.complete.obs")
+corrplot(matrise)
+
