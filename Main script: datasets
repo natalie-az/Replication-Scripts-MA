@@ -1,0 +1,268 @@
+################################################################
+####### R-Script for Master's Thesis. Natalie Azba. 2021 #######
+################################################################
+
+#Install packages
+packages <- c("dplyr", "tidyr","survival", "simPH", "texreg", 
+              "eha", "ggplot2", "survminer", "splitstackshape",
+              "coxed", "haven", "AER", "WDI", "countrycode", "huxtable",
+              "fixest", "stargazer", "ggplot2", "fixest",
+              "corrplot", "readxl", "jtools", "sandwich", 
+              "ggstance", "qwraps2", "tidyverse", "plm") ## Vector of needed packages
+
+#### Applying a function that installs/loads packages to the vector of packages
+sapply(packages, 
+       FUN = function(x){
+         ## Check if package is installed; if not, install it:
+         if(x %in% rownames(installed.packages()) == FALSE){
+           install.packages(x)
+         }
+         ## load the package:
+         library(x, character.only = TRUE)
+       })
+
+## Last inn data ## Load the dataset from Strøm et al. 2015 ##
+setwd("~/OneDrive - PRIO/datasets R Natalie Master's thesis")
+load("IDC_country-year_v1_0.RData")
+ps_data <- x ## Tilrettelegg data ## 
+
+class(ps_data) #view its class
+dim(ps_data) #view its dimension
+dimensions<- dim(ps_data)#6452 rows, and 57 columns 
+the_names <- names(ps_data) #find the column names
+the_names
+names(ps_data)#Looks at the column names 
+str(ps_data)#Summary-function of the datasets internatl structure 
+ls(ps_data)#Summary of all the variables used in the IDC dataset 
+
+############ Import and merge variables on Female Inclusiveness ############ 
+setwd("~/OneDrive - PRIO/datasets R Natalie Master's thesis")
+load("women.seat.data.rda") #load dataset
+women_seat_parliament_data <- women.seat.data #rename dataset
+
+# this code generates a new country ID. 
+#"countrycode" command is useful to generate compatible country codes
+library(countrycode)
+women_seat_parliament_data$gwno <- countrycode(women_seat_parliament_data$iso2c, 
+                                    origin = "iso2c", 
+                                    destination = "gwn")
+
+#----------------#----------------#----------------#----------------#----------------#---------#
+# Merging with the "left_join()" command, but you need to load the "dplyr" package first
+# the first argument is the "left" side dataset, the second one the "right" side data set from
+# which you want columns in your new data
+# the "by = " defines the joint IDs that need to be present in both datasets
+ps_data_merged <- left_join(ps_data, 
+                            women_seat_parliament_data,
+                            by = c("year", "gwno"))
+
+#explore dataset on the first merged. 
+head(ps_data_merged)
+summary(ps_data_merged)
+
+#creating a new dataobject <- filter along specific values or columns 
+library(tidyverse)
+
+tidy_ps_data <- ps_data_merged %>% select(c(gwno,country.x,ifs,year,inclusive,
+                                            gcman, gcimp, unity, gcseats1, 
+                                            gcseats2, gcseats3, partynoethnic,
+                                            mveto,resman, resimp,
+                                            SG.GEN.PARL.ZS))
+
+tidy_ps_data <- rename(tidy_ps_data, country = country.x)
+
+# Merging with the V-DEM variables / indices --------------------------
+# include: v2x_gender, v2x_gencl, v2x_gencs, v2x_genpp (years from 1975-2010) + country code
+# vdem dataset + tidy_ps_data 
+`V-Dem-CY-Full+Others-v10` <- readRDS("~/OneDrive - PRIO/datasets R Natalie Master's thesis/V-Dem-CY-Full+Others-v10.rds")
+vdem <- `V-Dem-CY-Full+Others-v10`
+new_merge <- vdem %>% select(c(v2x_gender, v2x_gencl, v2x_gencs, v2x_genpp, 
+                               e_civil_war, v2pepwrsoc, v2pepwrgen, v2cldmovew,
+                               e_migdppc, e_migdppcln, e_total_oil_income_pc))
+
+library(countrycode)#cow code
+vdem$gwno <- countrycode(vdem$country_text_id, 
+                                               origin = "iso3c", 
+                                               destination = "gwn")
+
+new_merge <- vdem %>% select(c(gwno, year, v2x_gender, v2x_gencl, v2x_gencs, v2x_genpp, 
+                               e_civil_war, v2pepwrsoc, v2pepwrgen, v2cldmovew,
+                               e_migdppc, e_migdppcln, e_total_oil_income_pc))
+
+tidy_ps_data <- left_join(tidy_ps_data, 
+                            new_merge,
+                            by = c("year", "gwno"), keep.x=TRUE)
+
+#####################################################################################
+# Deal with NAs and other values - telling R they are all MISSINGS in the dataframe
+#####################################################################################
+library(dplyr)
+library(magrittr)
+
+tidy_ps_data <- tidy_ps_data %>% mutate(gcimp=ifelse(gcimp=="-77" | gcimp=="-44",
+                                                     NA,gcimp), 
+                                        gcman=ifelse(gcman== "-77"| gcman=="-44",
+                                                     NA, gcman),
+                                        resimp=ifelse(resimp== "-77"| resimp=="-44",
+                                                      NA, resimp),
+                                        partynoethnic=ifelse(partynoethnic== "-77" | partynoethnic=="-44",
+                                                             NA, partynoethnic),
+                                        mveto=ifelse(mveto== "-77"| mveto=="-44",
+                                                     NA, mveto),
+                                        resman=ifelse(resman== "-77"| resman=="-44",
+                                                      NA, resman))
+
+# DO a lagged variable in dataframe. for variable INCLUSIVE 
+tidy_ps_data <- tidy_ps_data %>% arrange(country, year) %>%
+  group_by(country)%>%
+  mutate(inclusive_lag1 = dplyr::lag(inclusive, n=3, order_by = country)) #Lagged by 3 years n=3
+
+#####################################################################################
+################## MERGING VARIABLES ON GDP per capita, Oil EXPORT  #################
+#####################################################################################
+# 1. a time variable (keep in both OLS-bivariate regressions and tables)
+# 2. make a dummy variable civil conflict or not + time variable since conflict + battle deaths.
+# 3. GDP per capita and oil export (2 separate variables)
+
+### Dataset on GDP Per capita
+setwd("~/OneDrive - PRIO/datasets R Natalie Master's thesis")
+library(readxl)
+library(tidyr)
+library(dplyr)
+ny_gdp_pcap_kd_zg <- read_excel("ny_gdp_pcap_kd_zg.xlsx")
+GDP <- ny_gdp_pcap_kd_zg
+
+#I want only years 1975-2010 and merge with tidy_ps_data on country (gwno, country, ifs, year)
+long_table <- tidyr::gather(GDP, key=year, value = GDP, 1975:2009) #prøver å endre GDP dataset
+GDP_new <- GDP %>%
+  gather(year, GDP, -country)
+GDP_new$year <- gsub('X','',GDP_new$year )
+GDP_new$year <- as.numeric(GDP_new$year)
+
+library(countrycode)#cow code
+GDP_new$gwno <- countrycode(GDP_new$country, 
+                         origin = "country.name", 
+                         destination = "gwn")
+
+new_GDP.merge <- GDP_new %>% select(c(gwno, year, GDP))
+
+tidy_ps_data <- left_join(tidy_ps_data, 
+                          new_GDP.merge,
+                          by = c("year", "gwno"), keep.x=TRUE)
+
+####################################
+#### Dataset on Oil production #####
+####################################
+library(readxl)
+oil_production_total <- read_excel("oil_production_total.xlsx")
+OIL.production <- oil_production_total
+
+long_table<- tidyr::gather(OIL.production, key=year, value=OIL.production, 1975:2010)
+OIL_new <- OIL.production %>%
+  gather(year, OIL.production, - country)
+OIL_new$year <- gsub('X','',OIL_new$year )
+OIL_new$year <- as.numeric(OIL_new$year)
+
+library(countrycode)#cow code
+OIL_new$gwno <- countrycode(OIL_new$country, 
+                            origin = "country.name", 
+                            destination = "gwn")
+
+new_OIL.merge <- OIL_new %>% select(c(gwno, year, OIL.production))
+
+tidy_ps_data <- left_join(tidy_ps_data, 
+                          new_OIL.merge,
+                          by = c("year", "gwno"), keep.x=TRUE)
+
+# merge another dataset on percentage of women in parliaments: lower and upper houses combined
+women.bothhouses.parliaments <- read_excel("women_bothhouses_datasetGapMinder.xlsx")
+
+long_table<-tidyr::gather(women.bothhouses.parliaments, key=year, value=women.bothhouses.parliaments, 1975:2010)
+women.parl.new <- women.bothhouses.parliaments %>%
+ gather(year, women.bothhouses.parliaments, - country)
+women.parl.new$year <- gsub('X','',women.parl.new$year )
+women.parl.new$year <- as.numeric(women.parl.new$year)
+
+library(countrycode)#cow code
+women.parl.new$gwno <- countrycode(women.parl.new$country, 
+                            origin = "country.name", 
+                            destination = "gwn")
+
+new_women.merge <- women.parl.new %>% select(c(gwno, year, women.bothhouses.parliaments))
+
+tidy_ps_data <- left_join(tidy_ps_data, 
+                          new_women.merge,
+                          by = c("year", "gwno"), keep.x=TRUE)
+
+
+tidy_ps_data$women.bothhouses.parliaments <- tidy_ps_data$women.bothhouses.parliaments * 100 
+
+# --------# --------# --------# --------# --------# --------# --------# --------
+# civil war dataset : UCDP dataset on war
+# --------# --------# --------# --------# --------# --------# --------# --------
+library(readr)
+library(dplyr)
+library(magrittr)
+ucdp_onset_conf_2014 <- read_csv("ucdp-onset-conf-2014.csv")
+civil.war.data <- ucdp_onset_conf_2014 #endre navn 
+
+tidy_ps_data <- left_join(tidy_ps_data, 
+                          civil.war.data,
+                          by = c("year", "gwno"), keep.x=TRUE)
+
+
+#transforming variables GDP and OIL.production to LOG: 
+tidy_ps_data$oil_log <- log(tidy_ps_data$e_total_oil_income_pc+1) 
+summary(tidy_ps_data$oil_log)
+hist(tidy_ps_data$oil_log)
+
+hist(tidy_ps_data$GDP) #GDP Growth variable (do not use)
+hist(tidy_ps_data$e_migdppc)#vs. GDP per capita country-year.
+hist(tidy_ps_data$e_migdppcln) #GDP Per capita, logged, base 10
+
+#create a dummy to check for the effect of UNSCR 1325 resolutuon: 
+tidy_ps_data$post_2000 <- ifelse(tidy_ps_data$year > 2000, 1, 0)#year  greater than 2000
+
+### 1. Making trend graphs: Inclusive power sharing trends, 1975-2010.
+dataset.only.year <- tidy_ps_data %>% 
+  group_by(year) %>% 
+  summarise(average_inclusive = mean(inclusive, na.rm=T))
+
+library(ggplot2)
+trend <- ggplot(dataset.only.year,
+                aes(year, average_inclusive))+
+  geom_line(color= "steelblue")+
+  labs(title = "Trends of Power sharing, 1975-2010",
+       caption = "Inclusive Power sharing trends over time",
+       x="Year", 
+       y="Global average of Powersharing")
+
+trend +  theme(plot.background = element_rect(fill = 'beige', colour = 'red'))
+
+#summary statistics and data
+library(stargazer)
+mydata <- tidy_ps_data
+stargazer(as.data.frame(mydata[c("inclusive","women.bothhouses.parliaments", "year", "v2x_genpp",
+                                 "v2x_gencl", "v2x_gencs",
+                                 "e_migdppcln", "oil_log",
+                                 "maxintyearv414", "post_2000")]),
+          title="Descriptive statistics", 
+          digits=1, 
+          type = "latex", 
+          out="table1.txt", 
+          covariate.labels=c("Inclusive Power Sharing","Women's Share in Parliaments",
+                             "Year","Women's Political Participation Index", 
+                             "Women's Civil Liberties Index",
+                             "Women's Civil Society Participation Index",
+                             "GDP per capita Log",
+                             "Petroleum production per capita logged", 
+                             "Intensity level/Battle-related deaths",
+                             "Post 2000 UNSCR 1325"))
+
+#export dataset to Excel:
+library(writexl)
+write_xlsx(tidy_ps_data,"path to store the Excel file\\file name.xlsx")
+
+#################### #################### #################### ##########
+#################### END OF FIRST SCRIPT for final DATASET ##############
+#################### #################### #################### ##########
