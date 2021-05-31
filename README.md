@@ -1,7 +1,6 @@
-# Replication-Scripts-MA
-Master's thesis in Political Science, 
-
 The Illusion of Inclusion:  Assessing the Effects andGendered Implications of Power Sharing
+
+Master's thesis in Political Science, 
 
 University of Oslo
 Peace Research Institute Oslo (PRIO)
