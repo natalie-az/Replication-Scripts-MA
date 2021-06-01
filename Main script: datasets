@@ -30,7 +30,6 @@ class(ps_data) #view its class
 dim(ps_data) #view its dimension
 dimensions<- dim(ps_data)#6452 rows, and 57 columns 
 the_names <- names(ps_data) #find the column names
-the_names
 names(ps_data)#Looks at the column names 
 str(ps_data)#Summary-function of the datasets internatl structure 
 ls(ps_data)#Summary of all the variables used in the IDC dataset 
@@ -112,11 +111,6 @@ tidy_ps_data <- tidy_ps_data %>% mutate(gcimp=ifelse(gcimp=="-77" | gcimp=="-44"
                                         resman=ifelse(resman== "-77"| resman=="-44",
                                                       NA, resman))
 
-# DO a lagged variable in dataframe. for variable INCLUSIVE 
-tidy_ps_data <- tidy_ps_data %>% arrange(country, year) %>%
-  group_by(country)%>%
-  mutate(inclusive_lag1 = dplyr::lag(inclusive, n=3, order_by = country)) #Lagged by 3 years n=3
-
 #####################################################################################
 ################## MERGING VARIABLES ON GDP per capita, Oil EXPORT  #################
 #####################################################################################
@@ -194,7 +188,6 @@ tidy_ps_data <- left_join(tidy_ps_data,
                           new_women.merge,
                           by = c("year", "gwno"), keep.x=TRUE)
 
-
 tidy_ps_data$women.bothhouses.parliaments <- tidy_ps_data$women.bothhouses.parliaments * 100 
 
 # --------# --------# --------# --------# --------# --------# --------# --------
@@ -223,6 +216,18 @@ hist(tidy_ps_data$e_migdppcln) #GDP Per capita, logged, base 10
 #create a dummy to check for the effect of UNSCR 1325 resolutuon: 
 tidy_ps_data$post_2000 <- ifelse(tidy_ps_data$year > 2000, 1, 0)#year  greater than 2000
 
+#####################################################################################
+# LAG INDEPENDENT VARIABLES WITH ONE YEAR: T-1. 
+#####################################################################################
+
+tidy_ps_data <- tidy_ps_data %>% arrange(country, year) %>%
+  group_by(country)%>%
+  mutate(inclusive_lag1 = dplyr::lag(inclusive, n=1, order_by = country), 
+         gdp_log_lag = dplyr::lag(e_migdppcln, n=1, order_by = country),
+         oil_log_lag = dplyr::lag(oil_log, n=1, order_by = country),
+         Intensity_level_lag = dplyr::lag(maxintyearv414, n=1, order_by = country)) #Lagged by 1 years n=1
+
+#####################################################################################
 ### 1. Making trend graphs: Inclusive power sharing trends, 1975-2010.
 dataset.only.year <- tidy_ps_data %>% 
   group_by(year) %>% 
