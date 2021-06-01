@@ -1,28 +1,45 @@
-####################################################################################
-######################## MAIN MODELS USED IN ANALYSIS ##############################
-######## Report results with and without year fixed effects  #######################
-####################################################################################
-#Country-fixed Effects with year as control variable
-results.country.fixeff.all <- feols(c(women.bothhouses.parliaments, v2x_genpp,
-                                v2x_gencs, v2x_gencl) ~ inclusive + 
-                               e_migdppcln + oil_log + maxintyearv414 + year
-                               |country, 
-                               cluster = "country",
-                               data = tidy_ps_data)
+#######################################################
+############ MAIN MODELS ##############################
+#######################################################
 
-etable(results.country.fixeff.all,
-       dict = myDict,
-       file = "All variables", 
-       title = "All variables: Results country-fixed effects models",
+#Country-year with t-1 inclusive. Time-lag effect
+time.lag <-feols(c(women.bothhouses.parliaments, v2x_genpp, v2x_gencs,
+                   v2x_gencl) ~ inclusive_lag1 + inclusive_lag1 * post_2000 +
+                   gdp_log_lag + oil_log_lag + Intensity_level_lag
+                 |country + year, 
+                 data = tidy_ps_data,
+                 cluster = "country")
+etable(time.lag)
+
+#Robustness tests. t-3. inclusive
+#include one model with lagged dependent variable? t-1 
+variabel.navn = c(women.bothhouses.parliaments = "Women's share parliament",
+              v2x_genpp = "Women's political participation",
+              v2x_gencs = "Women's civil society participation",
+              v2x_gencl = "Women's civil liberties",
+              inclusive_lag1 = "Inclusive power sharing",
+              post_2000 = "Post-2000 UNSCR 1325",
+              gdp_log_lag = "GDP per capita logged", 
+              oil_log_lag = "Petroleum product. per capita logged",
+              Intensity_level_lag = "Intensity level/conflict country-year",
+              year = "Year") 
+etable(time.lag,
+       dict = variabel.navn,
+       file = "Time Country-year fixed effects with time-lag", 
+       title = "Time lag Country-year linear fixed effects models",
        tex=TRUE)
 
-#Country-year Fixed Effects 
+
+#Country-year Fixed Effects WITHOUT TIMELAG T-1
 main.model <- feols(c(women.bothhouses.parliaments, v2x_genpp, v2x_gencs,
-                 v2x_gencl) ~ inclusive + inclusive * post_2000 +
-        e_migdppcln + oil_log + maxintyearv414
-      |country + year, 
-      data = tidy_ps_data,
-      cluster = "country")
+                 v2x_gencl) ~ inclusive_lag1 + 
+                   gdp_log_lag + oil_log_lag  +
+                   Intensity_level_lag + inclusive_lag1 * post_2000
+                 |country + year,
+                 data = tidy_ps_data,
+                 cluster = "country")
+
+etable(main.model)
 
 nye.label = c(women.bothhouses.parliaments = "Women's share parliament",
               v2x_genpp = "Women's political participation",
@@ -43,29 +60,17 @@ etable(main.model,
        tex=TRUE)
 
 
-only.one.dependent <- feols(women.bothhouses.parliaments ~ inclusive + 
-                                 e_migdppcln + oil_log + maxintyearv414
+only.one.dependent <- feols(women.bothhouses.parliaments ~ inclusive_lag1 + 
+                              gdp_log_lag + oil_log_lag + Intensity_level_lag +
+                              inclusive_lag1 * post_2000
                                |country + year, 
                                data = tidy_ps_data,
                                cluster = "country")
 
-coefplot(only.one.dependent) 
 
-#####################################################################
-#SWITCH variables TO CHECK FOR REVERSED CAUSALITY: ENDOGENEITY BIAS
-#####################################################################
-results.SWITCH.Inclusive <- feols(inclusive ~ women.bothhouses.parliaments +
-                                  v2x_genpp + v2x_gencl + v2x_gencs + e_migdppcln + 
-                                    oil_log + maxintyearv414
-                                   |country + year,
-                                   cluster = "country",
-                                   data = tidy_ps_data)
-etable(results.SWITCH.Inclusive, 
-       dict = myDict,
-       file = "SWITCHED Inclusive as dependent", 
-       title = "SWITCHED Inclusive as dependent",
-       tex=TRUE)
-
+#########################################################
+#SWITCH variables TO CHECK FOR REVERSED CAUSALITY: 
+#####################################################
 # The variable myDict is the dictionary, we use to rename the variables, it is simply a named vector
 myDict = c(women.bothhouses.parliaments = "Women share parliaments",
            v2x_genpp = "Women political empow.index",
@@ -78,7 +83,87 @@ myDict = c(women.bothhouses.parliaments = "Women share parliaments",
            incidencev414 ="Dummy intrastate conflict",
            numbrofyearsonsetv414 = "Number of years since last conflict", 
            maxintyearv414 = "intensity level in the country-year") 
-           
+
+results.SWITCH.Inclusive <- feols(inclusive_lag1 ~ women.bothhouses.parliaments +
+                                  v2x_genpp + v2x_gencl + v2x_gencs + gdp_log_lag + 
+                                    oil_log_lag + 
+                                    Intensity_level_lag
+                                   |country + year,
+                                   cluster = "country",
+                                   data = tidy_ps_data)
+etable(results.SWITCH.Inclusive, 
+       dict = myDict,
+       file = "SWITCHED Inclusive as dependent", 
+       title = "Testing for endogeneity bias: reverse test",
+       tex=TRUE)
+
+#created a file in your directory for Overleaf "first export tables.tex"
+etable(results.inclusive.1, se="cluster",            
+       dict = myDict,
+       file = "OLS Fixed.eff.tex", 
+       title = "Results OLS fixed effects",
+       tex=TRUE)
+
+############## ############## ############## ############## ############## 
+############## Run one and one dependent variable: ############## ############## 
+###########################################################################
+
+one.fixef.2 <- feols(v2x_genpp ~ inclusive + 
+                       e_migdppcln + oil_log +
+                      maxintyearv414 
+                     |country + year,
+                     cluster = "country",
+                     data = tidy_ps_data)
+
+one.fixef.3 <- feols(v2x_gencl ~ inclusive + 
+                       e_migdppcln + oil_log + incidencev414 +
+                       numbrofyearsonsetv414 + maxintyearv414 
+                     |country, 
+                     data = tidy_ps_data,
+                     se="cluster")
+one.fixef.4 <- feols(v2x_gencs ~ inclusive + 
+                       e_migdppcln + oil_log + incidencev414 +
+                       numbrofyearsonsetv414 + maxintyearv414 
+                     |country, 
+                     data = tidy_ps_data,
+                     se="cluster")
+one.fixef.5 <- feols(v2x_gender ~ inclusive + 
+                       e_migdppcln + oil_log + incidencev414 +
+                       numbrofyearsonsetv414 + maxintyearv414 
+                     |country, 
+                     data = tidy_ps_data,
+                     se="cluster")
+
+########################################################################
+### Extract the coefficients from the objects then plot them in ggplot
+########################################################################
+one.fixef.1 <- feols(women.bothhouses.parliaments ~ inclusive_lag1 + 
+                       gdp_log_lag + oil_log_lag + Intensity_level_lag +
+                       inclusive_lag1 * post_2000
+                     |country + year,
+                     cluster = "country",
+                     data = tidy_ps_data)
+
+coef <- one.fixef.1$coefficients
+se <- one.fixef.1$se
+coef_se <- t(rbind(coef, se))
+row.names(coef_se)
+coef_se <- as.data.frame(coef_se)
+coef_se$variables <- rownames(coef_se)
+#change names inside here: 
+coefff <-coef_se
+row.names(coefff) <- c("Inclusive Power sharing lagged", "GDP Per capita log and laggedg", 
+                       "Oil per capita lagged",
+                       "Intensity Battle-related deaths lag", 
+                       "UNSCR 2000") # Modify row names
+
+coefff$new <- c("Inclusive Power sharing (t-1)", "GDP Per capita (t-1)", 
+                "Oil per capita (t-1)",
+                "Intensity Battle-related deaths (t-1)", "Post 2000 UNSCR")
+
+names(coef_se_2) <- c("coef_se", "se", "variables")
+library(dplyr)
+
 #create confidence interval 95% point_estimate +/ - 1.96*se
 s <- ggplot(coefff, aes(new, coef))+
   geom_point(color = "orange")+
@@ -88,15 +173,22 @@ s <- ggplot(coefff, aes(new, coef))+
                      ymax = coef + 1.96*se), color="blue") +
   labs(title = "Coefficient estimates", 
        subtitle = "on Women's share in parliament",
-       caption = "Country-year Fixed Effects",
+       caption = "Country-year Fixed Effects with lagged variables (t-1)",
        x = "Independent variables", y = "Coefficients") + 
   coord_flip()+scale_y_continuous(breaks = seq(-2, 3, 0.5))
-  
-  #fargelagt korrelasjonsmatrise
+
+s
+
+#fargelagt korrelasjonsmatrise
 library(corrplot)
 
 matrise<-cor(tidy_ps_data[, c("inclusive","women.bothhouses.parliaments",
-                                 "v2x_gencl","v2x_gencs","v2x_genpp")],
+                                 "v2x_gencl","v2x_gencs","v2x_genpp", "oil_log",
+                              "e_migdppcln", "maxintyearv414", "post_2000")],
              use = "pairwise.complete.obs")
 corrplot(matrise)
 
+#korrelasjonsmatrise med cor() 
+plot(tidy_ps_data[, c("inclusive","women.bothhouses.parliaments",
+                     "v2x_gencl","v2x_gencs","v2x_genpp")],
+    use = "pairwise.complete.obs")
