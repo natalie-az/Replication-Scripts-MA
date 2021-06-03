@@ -1,7 +1,7 @@
 #######################################################
 ############ MAIN MODELS ##############################
 #######################################################
-
+#main model 5.1. with 1 year lagged dependent variables? t-1 
 #Country-year with t-1 inclusive. Time-lag effect
 time.lag <-feols(c(women.bothhouses.parliaments, v2x_genpp, v2x_gencs,
                    v2x_gencl) ~ inclusive_lag1 + inclusive_lag1 * post_2000 +
@@ -12,7 +12,19 @@ time.lag <-feols(c(women.bothhouses.parliaments, v2x_genpp, v2x_gencs,
 etable(time.lag)
 
 #Robustness tests. t-3. inclusive
-#include one model with lagged dependent variable? t-1 
+lag.3.years <- feols(c(women.bothhouses.parliaments, v2x_genpp, v2x_gencs, #robustness check IV's lagged by 3 years
+                      v2x_gencl) ~ inclusive_lag3 + 
+                      gdp_log_lag3 + oil_log_lag3  +
+                      Intensity_level_lag3 + inclusive_lag3 * post_2000
+                    |country + year,
+                    data = tidy_ps_data,
+                    cluster = "country")
+etable(lag.3.years,
+       dict = nye.label,
+       file = "lag 3 year country-year fixed effects", 
+       title = "Country-year linear fixed effects models lagged 3 years",
+       tex=TRUE)
+       
 variabel.navn = c(women.bothhouses.parliaments = "Women's share parliament",
               v2x_genpp = "Women's political participation",
               v2x_gencs = "Women's civil society participation",
