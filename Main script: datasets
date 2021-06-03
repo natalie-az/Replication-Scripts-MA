@@ -227,6 +227,13 @@ tidy_ps_data <- tidy_ps_data %>% arrange(country, year) %>%
          oil_log_lag = dplyr::lag(oil_log, n=1, order_by = country),
          Intensity_level_lag = dplyr::lag(maxintyearv414, n=1, order_by = country)) #Lagged by 1 years n=1
 
+tidy_ps_data <- tidy_ps_data %>% arrange(country, year) %>%
+  group_by(country)%>%
+  mutate(inclusive_lag3 = dplyr::lag(inclusive, n=3, order_by = country), 
+         gdp_log_lag3 = dplyr::lag(e_migdppcln, n=3, order_by = country),
+         oil_log_lag3 = dplyr::lag(oil_log, n=3, order_by = country),
+         Intensity_level_lag3 = dplyr::lag(maxintyearv414, n=3, order_by = country)) #Lagged by 3 years n=3
+
 #####################################################################################
 ### 1. Making trend graphs: Inclusive power sharing trends, 1975-2010.
 dataset.only.year <- tidy_ps_data %>% 
