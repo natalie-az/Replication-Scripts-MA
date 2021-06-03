@@ -1,4 +1,4 @@
-The Illusion of Inclusion:  Assessing the Effects andGendered Implications of Power Sharing
+The Illusion of Inclusion:  Assessing the Effects and Gendered Implications of Power Sharing
 
 Master's thesis in Political Science, 
 
