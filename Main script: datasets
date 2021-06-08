@@ -347,3 +347,12 @@ ggplot(xy5, aes(x=demean))+
   geom_density(color="darkblue", fill="lightblue") +  
   labs(title="Distribution of main independent variable",
        x="Inclusive power sharing arrangements", y = "Density")
+
+### fargelagt korrelasjonsmatrise
+library(corrplot)
+
+matrise<-cor(tidy_ps_data[, c("inclusive","women.bothhouses.parliaments",
+                                 "v2x_gencl","v2x_gencs","v2x_genpp", "oil_log",
+                              "e_migdppcln", "maxintyearv414", "post_2000")],
+             use = "pairwise.complete.obs")
+corrplot(matrise)
