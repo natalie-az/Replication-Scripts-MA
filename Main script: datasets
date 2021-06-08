@@ -1,7 +1,6 @@
 ################################################################
 ####### R-Script for Master's Thesis. Natalie Azba. 2021 #######
 ################################################################
-
 #Install packages
 packages <- c("dplyr", "tidyr","survival", "simPH", "texreg", 
               "eha", "ggplot2", "survminer", "splitstackshape",
@@ -24,7 +23,7 @@ sapply(packages,
 ## Last inn data ## Load the dataset from Strøm et al. 2015 ##
 setwd("~/OneDrive - PRIO/datasets R Natalie Master's thesis")
 load("IDC_country-year_v1_0.RData")
-ps_data <- x ## Tilrettelegg data ## 
+ps_data <- x 
 
 class(ps_data) #view its class
 dim(ps_data) #view its dimension
@@ -72,7 +71,6 @@ tidy_ps_data <- rename(tidy_ps_data, country = country.x)
 
 # Merging with the V-DEM variables / indices --------------------------
 # include: v2x_gender, v2x_gencl, v2x_gencs, v2x_genpp (years from 1975-2010) + country code
-# vdem dataset + tidy_ps_data 
 `V-Dem-CY-Full+Others-v10` <- readRDS("~/OneDrive - PRIO/datasets R Natalie Master's thesis/V-Dem-CY-Full+Others-v10.rds")
 vdem <- `V-Dem-CY-Full+Others-v10`
 new_merge <- vdem %>% select(c(v2x_gender, v2x_gencl, v2x_gencs, v2x_genpp, 
@@ -92,9 +90,9 @@ tidy_ps_data <- left_join(tidy_ps_data,
                             new_merge,
                             by = c("year", "gwno"), keep.x=TRUE)
 
-#####################################################################################
-# Deal with NAs and other values - telling R they are all MISSINGS in the dataframe
-#####################################################################################
+#############################################################################################
+# Deal with missings (NA) and other values - telling R they are all MISSINGS in the dataframe
+#############################################################################################
 library(dplyr)
 library(magrittr)
 
@@ -204,7 +202,7 @@ tidy_ps_data <- left_join(tidy_ps_data,
                           by = c("year", "gwno"), keep.x=TRUE)
 
 
-#transforming variables GDP and OIL.production to LOG: 
+#transforming variables GDP and OIL.production to LOG: natural logarithm
 tidy_ps_data$oil_log <- log(tidy_ps_data$e_total_oil_income_pc+1) 
 summary(tidy_ps_data$oil_log)
 hist(tidy_ps_data$oil_log)
@@ -216,9 +214,9 @@ hist(tidy_ps_data$e_migdppcln) #GDP Per capita, logged, base 10
 #create a dummy to check for the effect of UNSCR 1325 resolutuon: 
 tidy_ps_data$post_2000 <- ifelse(tidy_ps_data$year > 2000, 1, 0)#year  greater than 2000
 
-#####################################################################################
-# LAG INDEPENDENT VARIABLES WITH ONE YEAR: T-1. 
-#####################################################################################
+#############################################################
+# LAG INDEPENDENT VARIABLES WITH ONE YEAR: T-1. #
+#############################################################
 
 tidy_ps_data <- tidy_ps_data %>% arrange(country, year) %>%
   group_by(country)%>%
@@ -227,6 +225,7 @@ tidy_ps_data <- tidy_ps_data %>% arrange(country, year) %>%
          oil_log_lag = dplyr::lag(oil_log, n=1, order_by = country),
          Intensity_level_lag = dplyr::lag(maxintyearv414, n=1, order_by = country)) #Lagged by 1 years n=1
 
+#### Robustness checks, lagged by 3 years (See Appendix in Master's thesis)
 tidy_ps_data <- tidy_ps_data %>% arrange(country, year) %>%
   group_by(country)%>%
   mutate(inclusive_lag3 = dplyr::lag(inclusive, n=3, order_by = country), 
@@ -278,3 +277,73 @@ write_xlsx(tidy_ps_data,"path to store the Excel file\\file name.xlsx")
 #################### #################### #################### ##########
 #################### END OF FIRST SCRIPT for final DATASET ##############
 #################### #################### #################### ##########
+
+#make dataframe with only countries to show units of measurement in appendix
+install.packages("xtable")
+library(xtable)
+
+country_vec1 <- unique(tidy_ps_data$country)[1:47]
+country_vec2 <- unique(tidy_ps_data$country)[48:93]
+country_vec3 <- unique(tidy_ps_data$country)[94:140]
+country_vec4 <- unique(tidy_ps_data$country)[141:185]
+
+country_vec2 <- c(country_vec2, NA)
+country_vec4<- c(country_vec4, NA, NA)
+countriesall.tab<-xtable(cbind(country_vec1, country_vec2, country_vec3, country_vec4))
+print(countriesall.tab, include.rownames = FALSE)
+
+##OLS vs. Fixed Effects. (F-test)
+#The results show that fixed effects are preferred over regular OLS
+Fixed<- plm(women.bothhouses.parliaments ~ inclusive_lag1 + 
+                   gdp_log_lag + oil_log_lag  +
+                   Intensity_level_lag + post_2000 + as.factor(year),
+                 data = tidy_ps_data [which(!is.na(tidy_ps_data$country)), ], 
+                 model = "within",
+                 index = c("country"))
+
+Ols<- lm(women.bothhouses.parliaments ~ inclusive_lag1 + 
+           gdp_log_lag + oil_log_lag  +
+           Intensity_level_lag + post_2000 + as.factor(year),
+         data = tidy_ps_data)
+
+pFtest(Fixed, Ols) #the value of the F test statistic.
+
+###############################################################################################
+############### Figures for Appendix: showing Distribution of the dependent variables #########
+###############################################################################################
+xy<-tidy_ps_data %>% group_by(country) %>% 
+  summarise(demean = women.bothhouses.parliaments - mean(women.bothhouses.parliaments, na.rm=T))
+
+ggplot(xy, aes(x=demean))+
+  geom_density(color="darkblue", fill="lightblue") +  
+  labs(title="Distribution of main dependent variable",
+       x="Women's share in parliaments (1975-2010)", y = "Density")
+
+xy2<-tidy_ps_data %>% group_by(country) %>% 
+  summarise(demean = v2x_gencl - mean(v2x_gencl, na.rm=T))
+
+ggplot(xy2, aes(x=demean))+
+  geom_density(color="darkblue", fill="lightblue") +  
+  labs(title="Distribution of dependent variable",
+       x="Women's civil liberties index", y = "Density")
+
+xy3<-tidy_ps_data %>% group_by(country) %>% 
+  summarise(demean = v2x_gencs - mean(v2x_gencs, na.rm=T))
+ggplot(xy3, aes(x=demean))+
+  geom_density(color="darkblue", fill="lightblue") +  
+  labs(title="Distribution of dependent variable",
+       x="Women's civil society participation index", y = "Density")
+
+xy4<-tidy_ps_data %>% group_by(country) %>% 
+  summarise(demean = v2x_genpp - mean(v2x_genpp, na.rm=T))
+ggplot(xy4, aes(x=demean))+
+  geom_density(color="darkblue", fill="lightblue") +  
+  labs(title="Distribution of dependent variable",
+       x="Women's political participation index", y = "Density")
+
+xy5<-tidy_ps_data %>% group_by(country) %>% 
+  summarise(demean = inclusive - mean(inclusive, na.rm=T))
+ggplot(xy5, aes(x=demean))+
+  geom_density(color="darkblue", fill="lightblue") +  
+  labs(title="Distribution of main independent variable",
+       x="Inclusive power sharing arrangements", y = "Density")
