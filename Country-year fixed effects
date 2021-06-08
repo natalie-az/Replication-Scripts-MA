@@ -1,7 +1,25 @@
+######################################################################## 
+################# Main models and results Fixed effects ################
+######################################################################## 
+#Country-fixed Effects with year as control variable
+results.country.fixeff.all <- feols(c(women.bothhouses.parliaments, v2x_genpp,
+                                v2x_gencs, v2x_gencl) ~ inclusive_lag1 + 
+                                  gdp_log_lag + oil_log_lag + Intensity_level_lag + 
+                                  inclusive_lag1 * post_2000 + as.factor(year)
+                               |country, 
+                               cluster = "country",
+                               data = tidy_ps_data)
+
+etable(results.country.fixeff.all,
+       dict = myDict,
+       file = "All variables", 
+       title = "All variables: Results country-fixed effects models",
+       tex=TRUE)
+
 #######################################################
-############ MAIN MODELS ##############################
+############ MAIN MODELS with lagged variables ########
 #######################################################
-#main model 5.1. with 1 year lagged dependent variables? t-1 
+
 #Country-year with t-1 inclusive. Time-lag effect
 time.lag <-feols(c(women.bothhouses.parliaments, v2x_genpp, v2x_gencs,
                    v2x_gencl) ~ inclusive_lag1 + inclusive_lag1 * post_2000 +
@@ -9,38 +27,23 @@ time.lag <-feols(c(women.bothhouses.parliaments, v2x_genpp, v2x_gencs,
                  |country + year, 
                  data = tidy_ps_data,
                  cluster = "country")
-etable(time.lag)
 
-#Robustness tests. t-3. inclusive
-lag.3.years <- feols(c(women.bothhouses.parliaments, v2x_genpp, v2x_gencs, #robustness check IV's lagged by 3 years
-                      v2x_gencl) ~ inclusive_lag3 + 
-                      gdp_log_lag3 + oil_log_lag3  +
-                      Intensity_level_lag3 + inclusive_lag3 * post_2000
-                    |country + year,
-                    data = tidy_ps_data,
-                    cluster = "country")
-etable(lag.3.years,
-       dict = nye.label,
-       file = "lag 3 year country-year fixed effects", 
-       title = "Country-year linear fixed effects models lagged 3 years",
-       tex=TRUE)
-       
 variabel.navn = c(women.bothhouses.parliaments = "Women's share parliament",
               v2x_genpp = "Women's political participation",
               v2x_gencs = "Women's civil society participation",
               v2x_gencl = "Women's civil liberties",
-              inclusive_lag1 = "Inclusive power sharing",
+              inclusive_lag1 = "Inclusive power sharing$_{t-1}$",
               post_2000 = "Post-2000 UNSCR 1325",
-              gdp_log_lag = "GDP per capita logged", 
-              oil_log_lag = "Petroleum product. per capita logged",
-              Intensity_level_lag = "Intensity level/conflict country-year",
+              gdp_log_lag = "GDP per capita logged$_{t-1}$", 
+              oil_log_lag = "Petroleum product. per capita logged$_{t-1}$",
+              Intensity_level_lag = "Intensity level/conflict country-year$_{t-1}$",
               year = "Year") 
+
 etable(time.lag,
        dict = variabel.navn,
-       file = "Time Country-year fixed effects with time-lag", 
-       title = "Time lag Country-year linear fixed effects models",
+       file = "TIME-lag Country-year fixed effects", 
+       title = "Country-year linear fixed effects models with lagged variables",
        tex=TRUE)
-
 
 #Country-year Fixed Effects WITHOUT TIMELAG T-1
 main.model <- feols(c(women.bothhouses.parliaments, v2x_genpp, v2x_gencs,
@@ -50,8 +53,6 @@ main.model <- feols(c(women.bothhouses.parliaments, v2x_genpp, v2x_gencs,
                  |country + year,
                  data = tidy_ps_data,
                  cluster = "country")
-
-etable(main.model)
 
 nye.label = c(women.bothhouses.parliaments = "Women's share parliament",
               v2x_genpp = "Women's political participation",
@@ -71,7 +72,32 @@ etable(main.model,
        title = "Country-year linear fixed effects models",
        tex=TRUE)
 
+#Robustness Checks: alternative model specifications (lagged with three years (Appendix))
+lag.3.years <- feols(c(women.bothhouses.parliaments, v2x_genpp, v2x_gencs, #robustness check IV's lagged by 3 years
+                      v2x_gencl) ~ inclusive_lag3 + 
+                      gdp_log_lag3 + oil_log_lag3  +
+                      Intensity_level_lag3 + inclusive_lag3 * post_2000
+                    |country + year,
+                    data = tidy_ps_data,
+                    cluster = "country")
 
+tlag3.label = c(women.bothhouses.parliaments = "Women's share parliament",
+              v2x_genpp = "Women's political participation",
+              v2x_gencs = "Women's civil society participation",
+              v2x_gencl = "Women's civil liberties",
+              inclusive_lag3 = "Inclusive power sharing$_{t-3}$",
+              gdp_log_lag3 = "GDP per capita logged$_{t-3}$", 
+              oil_log_lag3 = "Petroleum product. per capita logged$_{t-3}$",
+              Intensity_level_lag3 = "Intensity level/conflict country-year$_{t-3}$",
+              year = "Year") 
+
+etable(lag.3.years,
+       dict = tlag3.label,
+       file = "LAG 3 years country-year fixed effects", 
+       title = "Country-year linear fixed effects models lagged 3 years",
+       tex=TRUE)
+
+#Robustness checks
 only.one.dependent <- feols(women.bothhouses.parliaments ~ inclusive_lag1 + 
                               gdp_log_lag + oil_log_lag + Intensity_level_lag +
                               inclusive_lag1 * post_2000
@@ -79,10 +105,9 @@ only.one.dependent <- feols(women.bothhouses.parliaments ~ inclusive_lag1 +
                                data = tidy_ps_data,
                                cluster = "country")
 
-
 #########################################################
-#SWITCH variables TO CHECK FOR REVERSED CAUSALITY: 
-#####################################################
+### SWITCH variables TO CHECK FOR REVERSED CAUSALITY: ###
+#########################################################
 # The variable myDict is the dictionary, we use to rename the variables, it is simply a named vector
 myDict = c(women.bothhouses.parliaments = "Women share parliaments",
            v2x_genpp = "Women political empow.index",
@@ -116,8 +141,8 @@ etable(results.inclusive.1, se="cluster",
        title = "Results OLS fixed effects",
        tex=TRUE)
 
-############## ############## ############## ############## ############## 
-############## Run one and one dependent variable: ############## ############## 
+############## ############## ############## ############## ###############
+############## Run one and one dependent variable: ############## ######### 
 ###########################################################################
 
 one.fixef.2 <- feols(v2x_genpp ~ inclusive + 
@@ -188,19 +213,3 @@ s <- ggplot(coefff, aes(new, coef))+
        caption = "Country-year Fixed Effects with lagged variables (t-1)",
        x = "Independent variables", y = "Coefficients") + 
   coord_flip()+scale_y_continuous(breaks = seq(-2, 3, 0.5))
-
-s
-
-#fargelagt korrelasjonsmatrise
-library(corrplot)
-
-matrise<-cor(tidy_ps_data[, c("inclusive","women.bothhouses.parliaments",
-                                 "v2x_gencl","v2x_gencs","v2x_genpp", "oil_log",
-                              "e_migdppcln", "maxintyearv414", "post_2000")],
-             use = "pairwise.complete.obs")
-corrplot(matrise)
-
-#korrelasjonsmatrise med cor() 
-plot(tidy_ps_data[, c("inclusive","women.bothhouses.parliaments",
-                     "v2x_gencl","v2x_gencs","v2x_genpp")],
-    use = "pairwise.complete.obs")
